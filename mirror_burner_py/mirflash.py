@@ -42,6 +42,8 @@ def serial_ports():
     for port in ports:
         try:
             s = serial.Serial(port)
+            s.rts = False
+            s.dtr = False
             s.close()
             result.append(port)
         except (OSError, serial.SerialException):
@@ -128,8 +130,8 @@ transmitter_board = serial.Serial()
 transmitter_board.baudrate = 115200
 transmitter_board.port = device_array.get('transmitter')
 transmitter_board.timeout = 1000
-transmitter_board.rts = True
-transmitter_board.dtr = True
+transmitter_board.rts = False
+transmitter_board.dtr = False
 print(transmitter_board)
 
 transmitter_board.open()
