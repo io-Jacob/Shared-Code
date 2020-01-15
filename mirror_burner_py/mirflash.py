@@ -59,7 +59,7 @@ def flashFirmware(answers):
     print("Port: "+answers['port'])
     print("Firmware: "+answers['firmware'])
 
-device_array = {"fixture":"/dev/cu.SLAB_USBtoUART", "transmitter":"/dev/cu.SLAB_USBtoUART88", "receiver":"/dev/cu.SLAB_USBtoUART89"}
+device_array = {"fixture":"/dev/cu.SLAB_USBtoUART", "transmitter":"/dev/cu.SLAB_USBtoUART88", "receiver":"/dev/cu.SLAB_USBtoUART91"}
 
 if scanFixture:
     input('Press enter when only the Fixture Input is connected')
@@ -326,7 +326,8 @@ def loadTransmitterConfig(destinationPort):
             sys.exit("Failed to open port to Transmitter board")
 
     print('Loading Transmitter Configuration')
-    while True:
+    timeout = time.time()+30
+    while time.time() < timeout:
         try:
             receivedByteArray = destinationPort.read_until("\r\n".encode('utf-8'))
             received_line = receivedByteArray.decode("utf-8")
@@ -338,12 +339,13 @@ def loadTransmitterConfig(destinationPort):
                     global transmitter_config
                     transmitter_config = transmitter_json
                     destinationPort.close()
-                    print(json.dumps(transmitter_config))
+                    # print(json.dumps(transmitter_config))
                     print('Transmitter Configuration Loaded:')
                     print("")
                     return
         except:
             continue
+    sys.exit("failed to load Transmitter Configuration")
 
 def loadReceiverConfig(destinationPort):
     if not destinationPort.is_open:
@@ -353,7 +355,8 @@ def loadReceiverConfig(destinationPort):
             sys.exit("Failed to open port to Receiver board")
 
     print('Loading Receiver Configuration')
-    while True:
+    timeout = time.time()+30
+    while time.time() < timeout:
         try:
             receivedByteArray = destinationPort.read_until("\r\n".encode('utf-8'))
             received_line = receivedByteArray.decode("utf-8")
@@ -364,12 +367,13 @@ def loadReceiverConfig(destinationPort):
                     global receiver_config
                     receiver_config = receiver_json
                     destinationPort.close()
-                    print(json.dumps(receiver_config))
+                    # print(json.dumps(receiver_config))
                     print("Receiver Configuration Loaded:")
                     print("")
                     return
         except:
             continue
+    sys.exit("failed to load Receiver Configuration")
 
 def getFixtureReadings(destinationPort):
     if not destinationPort.is_open:
@@ -379,7 +383,8 @@ def getFixtureReadings(destinationPort):
             sys.exit("Failed to open port to Fixture board")
 
     print('Loading readings from fixture board')
-    while True:
+    timeout = time.time()+30
+    while time.time() < timeout:
         receivedByteArray = destinationPort.read_until("\r\n".encode('utf-8'))
         received_line = receivedByteArray.decode("utf-8")
         received_line = received_line.replace('\r\n','')
@@ -395,6 +400,7 @@ def getFixtureReadings(destinationPort):
                 return
         except:
             continue
+    sys.exit("failed to load Receiver Configuration")
 
 def pairDevices(transmitterPort, receiverPort):
     timeout = time.time()+30
@@ -405,15 +411,12 @@ def pairDevices(transmitterPort, receiverPort):
                     try:
                         transmitterDestinationJSON = json.loads('{}')
                         transmitterDestinationJSON['destination_address'] = receiver_config['local_address']
-                        print(type(receiver_config['local_address']))
                         if not transmitterPort.is_open:
-                            print('opening serial port to transmitter')
                             transmitterPort.open()
                             time.sleep(0.1)
                         transmitterPort.write((json.dumps(transmitterDestinationJSON)).encode())
                         transmitterPort.write('\n'.encode())
-                        print("wrote to transmitter: ")
-                        print(json.dumps(transmitterDestinationJSON).encode())
+                        time.sleep(0.5)
                         transmitterPort.close()
                     except:
                         sys.exit('failed to write destination address to transmitter')
@@ -426,10 +429,7 @@ def pairDevices(transmitterPort, receiverPort):
                             time.sleep(0.1)
                         receiverPort.write((json.dumps(receiverDestinationJSON)).encode())
                         receiverPort.write('\n'.encode())
-                        print("wrote to receiver: ")
-                        print(json.dumps(receiverDestinationJSON))
-                        print("receiver port:")
-                        print(receiverPort.port)
+                        time.sleep(0.5)
                         receiverPort.close()
                     except:
                         sys.exit('failed to write destination address to receiver')
@@ -437,12 +437,6 @@ def pairDevices(transmitterPort, receiverPort):
                         loadTransmitterConfig(transmitterPort)
                         if transmitter_config['destination_address'] == receiver_config['local_address']:
                             break
-                        else:
-                            print("Transmitter Destination address is:")
-                            print(transmitter_config['destination_address'])
-                            print("Should Be:")
-                            print(receiver_config['local_address'])
-                            print("")
                     while time.time() < timeout:
                         loadReceiverConfig(receiverPort)
                         if receiver_config['destination_address'] == transmitter_config['local_address']:
@@ -454,6 +448,10 @@ def pairDevices(transmitterPort, receiverPort):
                         if receiver_config["channel_1"]["converted"] > 2 and receiver_config["channel_2"]["converted"] > 2 and receiver_config["channel_3"]["converted"] > 2 and receiver_config["channel_4"]["converted"] > 2:
                             print("Device Communication Successful")
                             return
+                        else:
+                            print("channel 1 reading: ", end='')
+                            print(receiver_config["channel_1"]["converted"])
+                    sys.exit("Device Connection Failed")
             if not 'local_address' in transmitter_config:
                 print('no local address in transmitter_config:')
                 print(json.dumps(transmitter_config))
@@ -473,7 +471,8 @@ def pairDevices(transmitterPort, receiverPort):
 
 def calibrateReceiver(receiverPort, fixturePort):
     print("calibrating receiver")
-    while True:
+    timeout = time.time()+30
+    while time.time() < timeout:
         getFixtureReadings(fixturePort)
         if 'channel_1' in fixture_readings and 'channel_2' in fixture_readings and 'channel_3' in fixture_readings and 'channel_4' in fixture_readings:
             if fixture_readings['channel_1'] > 2 and fixture_readings['channel_2'] > 2 and fixture_readings['channel_3'] > 2 and fixture_readings['channel_4'] > 2:
@@ -493,11 +492,13 @@ def calibrateReceiver(receiverPort, fixturePort):
                     receiverPort.close()
                     return
                 except:
-                    sys.exit("Configuration of receiver failed")
+                    sys.exit("Configuration of Receiver Failed")
+    sys.exit("Configuration of Receiver Failed")
 
 def calibrateTransmitter(destinationPort):
     print("Calibrating Transmitter")
-    while True:
+    timeout = time.time()+30
+    while time.time() < timeout:
         try:
             transmitterConfigJSON = json.loads('{}')
             transmitter_json = json.loads(received_line)
@@ -521,6 +522,7 @@ def calibrateTransmitter(destinationPort):
             loadTransmitterConfig()
         except:
             continue
+    sys.exit("Configuration of Transmitter Failed")
 
 loadTransmitterConfig(transmitter_board)
 loadReceiverConfig(receiver_board)
